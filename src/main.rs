@@ -19,6 +19,17 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
+    let builder = tracing_subscriber::fmt()
+        .pretty()
+        .with_line_number(false)
+        .with_file(false)
+        .with_thread_ids(false)
+        .with_thread_names(false);
+
+    builder
+        .try_init()
+        .expect("initialized subscriber succesfully");
+
     let cli = Cli::parse();
 
     match &cli.command {

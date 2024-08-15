@@ -709,6 +709,7 @@ dependencies = [
  "rumqttc",
  "rumqttd",
  "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
