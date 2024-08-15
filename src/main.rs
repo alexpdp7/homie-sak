@@ -1,6 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use clap::{Parser, Subcommand};
+use homie_device::{ColorFormat, HomieDevice, Node, Property};
+use rumqttc::MqttOptions;
 use rumqttd::{Broker, Config, ConnectionSettings, ServerSettings};
 
 #[derive(Parser)]
@@ -13,9 +15,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Serve,
+    Device,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -43,6 +46,36 @@ fn main() {
             })
             .start()
             .unwrap();
+            Ok(())
+        }
+        Commands::Device => {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(device())?;
+            Ok(())
         }
     }
+}
+
+async fn device() -> anyhow::Result<()> {
+    println!("device");
+    let mqtt_options = MqttOptions::new("device", "127.0.0.1", 8000);
+    let builder = HomieDevice::builder("homie/device", "Device", mqtt_options);
+    let (mut homie, homie_handle) = builder.spawn().await?;
+    let node = Node::new(
+        "light",
+        "Light",
+        "light",
+        vec![
+            Property::boolean("power", "On", true, true, None),
+            Property::color("colour", "Colour", true, true, None, ColorFormat::Rgb),
+        ],
+    );
+    homie.add_node(node).await?;
+    homie.ready().await?;
+    println!("ready");
+    homie_handle.await?;
+    Ok(())
 }
