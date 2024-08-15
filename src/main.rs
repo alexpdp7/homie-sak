@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use clap::{Parser, Subcommand};
 use homie_device::{ColorFormat, HomieDevice, Node, Property};
 use rumqttc::MqttOptions;
-use rumqttd::{Broker, Config, ConnectionSettings, ServerSettings};
+use rumqttd::{Broker, Config, ConnectionSettings, RouterConfig, ServerSettings};
 
 #[derive(Parser)]
 #[command()]
@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Serve => {
             println!("serve");
             Broker::new(Config {
-                v5: Some(HashMap::from([(
+                v4: Some(HashMap::from([(
                     "foo".to_owned(),
                     ServerSettings {
                         name: "foo".to_owned(),
@@ -53,6 +53,13 @@ fn main() -> anyhow::Result<()> {
                         },
                     },
                 )])),
+                router: RouterConfig {
+                    max_connections: 10010,
+                    max_outgoing_packet_count: 200,
+                    max_segment_size: 104856700,
+                    max_segment_count: 10,
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .start()
