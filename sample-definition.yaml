@@ -2,9 +2,9 @@ configs:
   controller_host_1:
     devices:
       example_host_1:
-        wol:
-          switch:
-            datatype: boolean
+        properties:
+          wol:
+            datatype: Boolean
             settable: true
             retained: false
             run_command:
@@ -13,8 +13,9 @@ configs:
   controller_host_2:
     devices:
       console:
-        send_message:
-            datatype: boolean
+        properties:
+          send_message:
+            datatype: Boolean
             settable: true
             retained: false
             run_command:
