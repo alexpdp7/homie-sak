@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     path::PathBuf,
     str::FromStr,
-    sync::OnceLock,
+    sync::Arc,
 };
 
 use clap::{Parser, Subcommand};
@@ -138,24 +138,47 @@ enum Datatype {
     Boolean,
 }
 
-static HOST: OnceLock<Host> = OnceLock::new();
-
 async fn device(
     configuration_path: &PathBuf,
     host: &String,
     mqtt_host: &String,
     mqtt_port: u16,
 ) -> anyhow::Result<()> {
-    let configurations = serde_yaml::from_str::<Configurations>(
-        &std::fs::read_to_string(configuration_path).unwrap(),
-    )?;
-    println!("configurations {configurations:#?}");
-    HOST.get_or_init(|| configurations.configs.get(host).unwrap().clone());
+    let devices = Arc::new(
+        serde_yaml::from_str::<Configurations>(
+            &std::fs::read_to_string(configuration_path).unwrap(),
+        )?
+        .configs
+        .get(host)
+        .unwrap()
+        .devices
+        .clone(),
+    );
     let mqtt_options = MqttOptions::new(host, mqtt_host, mqtt_port);
     let mut builder = HomieDevice::builder(&format!("homie/{host}"), host, mqtt_options);
-    builder.set_update_callback(update_callback);
+    let inner_devices = devices.clone();
+    builder.set_update_callback(move |node_id, property_id, value| {
+        let devices = inner_devices.clone();
+        async move {
+            println!("node_id {node_id} property_id {property_id} value {value}");
+            let command = &devices
+                .get(&node_id)
+                .unwrap()
+                .properties
+                .get(&property_id)
+                .unwrap()
+                .run_command;
+            println!("executing {command:?}");
+            let mut command = VecDeque::from(command.clone());
+            std::process::Command::new(command.pop_front().unwrap())
+                .args(command)
+                .status()
+                .unwrap();
+            Some("hi".to_owned())
+        }
+    });
     let (mut homie, homie_handle) = builder.spawn().await?;
-    for (device_name, device) in &HOST.get().unwrap().devices {
+    for (device_name, device) in devices.clone().iter() {
         let properties = device
             .properties
             .iter()
@@ -176,25 +199,4 @@ async fn device(
     println!("ready");
     homie_handle.await?;
     Ok(())
-}
-
-async fn update_callback(node_id: String, property_id: String, value: String) -> Option<String> {
-    println!("node_id {node_id} property_id {property_id} value {value}");
-    let command = &HOST
-        .get()
-        .unwrap()
-        .devices
-        .get(&node_id)
-        .unwrap()
-        .properties
-        .get(&property_id)
-        .unwrap()
-        .run_command;
-    println!("executing {command:?}");
-    let mut command = VecDeque::from(command.clone());
-    std::process::Command::new(command.pop_front().unwrap())
-        .args(command)
-        .status()
-        .unwrap();
-    Some("hi".to_owned())
 }
