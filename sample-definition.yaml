@@ -1,0 +1,23 @@
+configs:
+  controller_host_1:
+    devices:
+      example_host_1:
+        properties:
+          wol:
+            datatype: Boolean
+            settable: true
+            retained: false
+            run_command:
+              - wol
+              - 4c:f3:2d:5a:ea:1f
+  controller_host_2:
+    devices:
+      console:
+        properties:
+          send_message:
+            datatype: Boolean
+            settable: true
+            retained: false
+            run_command:
+              - echo
+              - hi
