@@ -7,7 +7,7 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use homie_device::{HomieDevice, Node, Property as HomieDeviceProperty};
-use rumqttc::MqttOptions;
+use rumqttc::{Client, MqttOptions, Packet};
 use rumqttd::{Broker, Config, ConnectionSettings, RouterConfig, ServerSettings};
 use serde::Deserialize;
 
@@ -26,6 +26,12 @@ enum Commands {
         host: String,
         mqtt_host: String,
         mqtt_port: u16,
+    },
+    SetProperty {
+        device_id: String,
+        node_id: String,
+        property_id: String,
+        value: String,
     },
 }
 
@@ -106,6 +112,30 @@ fn main() -> anyhow::Result<()> {
                 .unwrap()
                 .block_on(device(configuration_path, host, mqtt_host, *mqtt_port))?;
             Ok(())
+        }
+        Commands::SetProperty {
+            device_id,
+            node_id,
+            property_id,
+            value,
+        } => {
+            let mqtt_options = MqttOptions::new("homie-sak-set-property", "localhost", 8000);
+            let (mut client, mut connection) = Client::new(mqtt_options, 10);
+            client
+                .publish(
+                    format!("homie/{device_id}/{node_id}/{property_id}/set"),
+                    rumqttc::QoS::ExactlyOnce,
+                    true,
+                    value.as_bytes(),
+                )
+                .unwrap();
+            for event in connection.iter() {
+                let event = event.unwrap();
+                if let rumqttc::Event::Incoming(Packet::PubComp(_)) = event {
+                    std::process::exit(0);
+                }
+            }
+            unreachable!("should not happen");
         }
     }
 }
